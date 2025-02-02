@@ -9,7 +9,7 @@ from datetime import datetime
 import threading
 from dotenv import load_dotenv
 import os
-from boot_habito_whatsApp.database import get_db_connection
+from database import get_db_connection
 
 # Carrega as variáveis de ambiente do arquivo .env
 load_dotenv()
