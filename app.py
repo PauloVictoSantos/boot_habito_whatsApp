@@ -9,23 +9,22 @@ import threading
 from dotenv import load_dotenv
 import os
 
-# Carrega as variáveis de ambiente do arquivo .env
+# Carregar variáveis de ambiente
 load_dotenv()
 
-app = Flask(__name__)
-
-# Configurações do Twilio usando variáveis de ambiente
+# Configurações Twilio
 account_sid = os.getenv('TWILIO_ACCOUNT_SID')
 auth_token = os.getenv('TWILIO_AUTH_TOKEN')
 twilio_client = Client(account_sid, auth_token)
 twilio_whatsapp_number = os.getenv('TWILIO_WHATSAPP_NUMBER')
 user_whatsapp_number = os.getenv('USER_WHATSAPP_NUMBER')
 
+# Nome do arquivo CSV
 DATA_FILE = 'atividades.csv'
 
 def enviar_lembrete():
     try:
-        mensagem = "⏰ Hora de registrar sua atividade! Formato: 'Atividade, Hora Início, Hora Fim, Categoria'"
+        mensagem = "⏰ Hora de registrar sua atividade! Formato: 'Atividade, Categoria'"
 
         twilio_client.messages.create(
             body=mensagem,
@@ -42,17 +41,15 @@ def agendar_lembretes():
         schedule.run_pending()
         time.sleep(1)
 
+# Iniciar lembretes em outra thread para não travar o Flask
 threading.Thread(target=agendar_lembretes, daemon=True).start()
 
 def salvar_atividade_csv(atividade, categoria, user, data_inicio, data_termino):
-    # Verifica se o arquivo já existe
     try:
         df = pd.read_csv(DATA_FILE)
     except FileNotFoundError:
-        # Se não existe, cria um novo arquivo CSV com o cabeçalho
         df = pd.DataFrame(columns=['data_inicio', 'data_termino', 'atividade', 'categoria', 'usuario'])
     
-    # Adiciona os dados
     nova_atividade = {
         'data_inicio': data_inicio,
         'data_termino': data_termino,
@@ -61,9 +58,9 @@ def salvar_atividade_csv(atividade, categoria, user, data_inicio, data_termino):
         'usuario': user
     }
     df = df.append(nova_atividade, ignore_index=True)
-    
-    # Salva novamente no arquivo CSV
     df.to_csv(DATA_FILE, index=False)
+
+app = Flask(__name__)
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -76,23 +73,14 @@ def webhook():
 
 def process_message(msg, user):
     try:
-        # Formato esperado: "Atividade, Categoria"
-        # Exemplo: "Estudar Python, Estudos"
-        atividade, categoria = msg.split(',', 1)  # Divide apenas na primeira vírgula
-        atividade = atividade.strip()
-        categoria = categoria.strip()
-
-        # Captura data/hora atual
+        atividade, categoria = msg.split(',', 1)
+        atividade, categoria = atividade.strip(), categoria.strip()
         data_inicio = datetime.now()
-        data_termino = data_inicio  # Ou ajuste conforme a lógica desejada
-
-        # Salva no arquivo CSV
+        data_termino = data_inicio
         salvar_atividade_csv(atividade, categoria, user, data_inicio, data_termino)
-
         return "✅ Atividade registrada com sucesso!"
-
     except Exception as e:
-        return f"❌ Erro: Formato inválido. Use: 'Atividade, Categoria'.\nExemplo: 'Academia, Saúde'"
+        return "❌ Erro: Use o formato 'Atividade, Categoria'. Exemplo: 'Academia, Saúde'"
 
 if __name__ == '__main__':
-    app.run(port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
