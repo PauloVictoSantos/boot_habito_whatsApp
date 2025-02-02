@@ -5,9 +5,11 @@ import pandas as pd
 from datetime import datetime
 import schedule
 import time
+from datetime import datetime
 import threading
 from dotenv import load_dotenv
 import os
+from boot_habito_whatsApp.database import get_db_connection
 
 # Carrega as variáveis de ambiente do arquivo .env
 load_dotenv()
@@ -55,24 +57,31 @@ def webhook():
 
 def process_message(msg, user):
     try:
-        data = msg.split(',')
-        atividade, inicio, termino, categoria = [d.strip() for d in data]
+        # Formato esperado: "Atividade, Categoria"
+        # Exemplo: "Estudar Python, Estudos"
+        atividade, categoria = msg.split(',', 1)  # Divide apenas na primeira vírgula
+        atividade = atividade.strip()
+        categoria = categoria.strip()
 
-        df = pd.DataFrame({
-            'Data': [datetime.now().strftime('%Y-%m-%d')],
-            'Atividade': [atividade],
-            'Início': [inicio],
-            'Término': [termino],
-            'Categoria': [categoria],
-            'Usuário': [user]
-        })
+        # Captura data/hora atual
+        data_inicio = datetime.now()
+        data_termino = data_inicio  # Ou ajuste conforme a lógica desejada
 
-        df.to_csv(DATA_FILE, mode='a', header=not pd.io.common.file_exists(DATA_FILE), index=False)
+        # Salva no banco de dados
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO atividades (data_inicio, data_termino, atividade, categoria, usuario)
+            VALUES (%s, %s, %s, %s, %s)
+        ''', (data_inicio, data_termino, atividade, categoria, user))
+        conn.commit()
+        cursor.close()
+        conn.close()
 
         return "✅ Atividade registrada com sucesso!"
 
     except Exception as e:
-        return f"❌ Erro: Formato inválido. Use: 'Atividade, HH:MM, HH:MM, Categoria'.\nExemplo: 'Academia, 18:00, 19:00, Saúde'"
+        return f"❌ Erro: Formato inválido. Use: 'Atividade, Categoria'.\nExemplo: 'Academia, Saúde'"
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
