@@ -1,11 +1,15 @@
+import os
+from dotenv import load_dotenv
 import mysql.connector
+
+load_dotenv()
 
 def get_db_connection():
     return mysql.connector.connect(
-        host="localhost",      # Ou "127.0.0.1"
-        user="root",           # Usuário do MySQL
-        password="01470439212",  # Senha definida na instalação
-        database="habitos_whatsapp"
+        host=os.getenv("DB_HOST"),       # Obtém o valor da variável DB_HOST
+        user=os.getenv("DB_USER"),       # Obtém o valor da variável DB_USER
+        password=os.getenv("DB_PASSWORD"),  # Obtém o valor da variável DB_PASSWORD
+        database=os.getenv("DB_DATABASE")   # Obtém o valor da variável DB_DATABASE
     )
 
 from database import get_db_connection
