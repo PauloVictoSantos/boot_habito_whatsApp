@@ -5,11 +5,9 @@ import pandas as pd
 from datetime import datetime
 import schedule
 import time
-from datetime import datetime
 import threading
 from dotenv import load_dotenv
 import os
-from database import get_db_connection
 
 # Carrega as variáveis de ambiente do arquivo .env
 load_dotenv()
@@ -28,7 +26,7 @@ DATA_FILE = 'atividades.csv'
 def enviar_lembrete():
     try:
         mensagem = "⏰ Hora de registrar sua atividade! Formato: 'Atividade, Hora Início, Hora Fim, Categoria'"
-        
+
         twilio_client.messages.create(
             body=mensagem,
             from_=twilio_whatsapp_number,
@@ -45,6 +43,27 @@ def agendar_lembretes():
         time.sleep(1)
 
 threading.Thread(target=agendar_lembretes, daemon=True).start()
+
+def salvar_atividade_csv(atividade, categoria, user, data_inicio, data_termino):
+    # Verifica se o arquivo já existe
+    try:
+        df = pd.read_csv(DATA_FILE)
+    except FileNotFoundError:
+        # Se não existe, cria um novo arquivo CSV com o cabeçalho
+        df = pd.DataFrame(columns=['data_inicio', 'data_termino', 'atividade', 'categoria', 'usuario'])
+    
+    # Adiciona os dados
+    nova_atividade = {
+        'data_inicio': data_inicio,
+        'data_termino': data_termino,
+        'atividade': atividade,
+        'categoria': categoria,
+        'usuario': user
+    }
+    df = df.append(nova_atividade, ignore_index=True)
+    
+    # Salva novamente no arquivo CSV
+    df.to_csv(DATA_FILE, index=False)
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -67,16 +86,8 @@ def process_message(msg, user):
         data_inicio = datetime.now()
         data_termino = data_inicio  # Ou ajuste conforme a lógica desejada
 
-        # Salva no banco de dados
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO atividades (data_inicio, data_termino, atividade, categoria, usuario)
-            VALUES (%s, %s, %s, %s, %s)
-        ''', (data_inicio, data_termino, atividade, categoria, user))
-        conn.commit()
-        cursor.close()
-        conn.close()
+        # Salva no arquivo CSV
+        salvar_atividade_csv(atividade, categoria, user, data_inicio, data_termino)
 
         return "✅ Atividade registrada com sucesso!"
 
